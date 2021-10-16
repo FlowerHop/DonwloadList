@@ -2,12 +2,13 @@ package com.flowerhop.downloadlist.model.repository
 
 import com.flowerhop.downloadlist.model.CloudFile
 import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class FakeRepository: FileRepository {
-    private val executor: Executor = Executors.newSingleThreadExecutor()
-    private val downloadExecutor: Executor = Executors.newFixedThreadPool(NUMBER_OF_DOWNLOAD_THREAD)
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val downloadExecutor: ExecutorService = Executors.newFixedThreadPool(NUMBER_OF_DOWNLOAD_THREAD)
     private val downloadMap: HashMap<String, DownloadTask> = HashMap()
 
     override fun queryFiles(onQueryListener: OnQueryListener) {
@@ -30,6 +31,11 @@ class FakeRepository: FileRepository {
     override fun cancelDownloadFile(cloudFile: CloudFile) {
         downloadMap[cloudFile.id]?.cancel() ?: return
         downloadMap.remove(cloudFile.id)
+    }
+
+    override fun shutdown() {
+        executor.shutdownNow()
+        downloadExecutor.shutdownNow()
     }
 
     private fun createFakeFiles(): List<CloudFile> {
