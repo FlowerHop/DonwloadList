@@ -16,7 +16,9 @@ class FakeRepository: FileRepository {
     }
 
     override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        simulateDownload(cloudFile, onDownloadListener)
+        executor.execute {
+            simulateDownload(cloudFile, onDownloadListener)
+        }
     }
 
     private fun createFakeFiles(): List<CloudFile> {
@@ -50,8 +52,8 @@ class FakeRepository: FileRepository {
             Thread.sleep(SLEEP_INTERVAL_FOR_DOWNLOADING)
             downloaded += DOWNLOAD_SPEED
 
-            val downloadedPortion:Float = (downloaded/totalSize).toFloat()
-            onDownloadListener.onProgress(downloadedPortion.toInt())
+            val downloadedPortion:Float = downloaded.div(totalSize.toFloat())
+            onDownloadListener.onProgress((downloadedPortion*100).toInt())
         }
 
         onDownloadListener.onComplete()
