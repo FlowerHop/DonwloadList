@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 
 class FakeRepository: FileRepository {
     private val executor: Executor = Executors.newSingleThreadExecutor()
+    private val downloadExecutor: Executor = Executors.newFixedThreadPool(NUMBER_OF_DOWNLOAD_THREAD)
 
     override fun queryFiles(onQueryListener: OnQueryListener) {
         executor.execute {
@@ -16,7 +17,7 @@ class FakeRepository: FileRepository {
     }
 
     override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        executor.execute {
+        downloadExecutor.execute {
             simulateDownload(cloudFile, onDownloadListener)
         }
     }
@@ -60,6 +61,7 @@ class FakeRepository: FileRepository {
     }
 
     companion object {
+        private const val NUMBER_OF_DOWNLOAD_THREAD = 20
         /**
          * download bytes per 100ms
          */
