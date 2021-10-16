@@ -2,15 +2,14 @@ package com.flowerhop.downloadlist
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.flowerhop.downloadlist.databinding.ActivityMainBinding
+import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import com.flowerhop.downloadlist.model.repository.FakeRepository
 import com.flowerhop.downloadlist.mvvm.AnyViewModelFactory
 import com.flowerhop.downloadlist.ui.CloudFileListAdapter
-import kotlin.math.log
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,7 +20,9 @@ class MainActivity : AppCompatActivity() {
         val recyclerView = binding.cloudFileList
 
         val viewModelFactory = AnyViewModelFactory {
-            CloudFileListViewModel(FakeRepository())
+            val downloadService = CloudFileDownloadService()
+            val fakeRepository = FakeRepository(downloadService)
+            CloudFileListViewModel(fakeRepository)
         }
 
         val viewModel = ViewModelProvider(this, viewModelFactory).get(CloudFileListViewModel::class.java)

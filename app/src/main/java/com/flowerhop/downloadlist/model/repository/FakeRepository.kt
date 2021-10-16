@@ -1,16 +1,12 @@
 package com.flowerhop.downloadlist.model.repository
 
 import com.flowerhop.downloadlist.model.CloudFile
-import com.flowerhop.downloadlist.model.DownloadTask
-import java.util.concurrent.Executor
+import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
-class FakeRepository: FileRepository {
+class FakeRepository(private val downloadService: CloudFileDownloadService): FileRepository {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private val downloadExecutor: ExecutorService = Executors.newFixedThreadPool(NUMBER_OF_DOWNLOAD_THREAD)
-    private val downloadMap: HashMap<String, DownloadTask> = HashMap()
 
     override fun queryFiles(onQueryListener: OnQueryListener) {
         executor.execute {
@@ -21,22 +17,16 @@ class FakeRepository: FileRepository {
     }
 
     override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        if (downloadMap[cloudFile.id] != null)  return
-
-        val downloadTask = DownloadTask.create(cloudFile, onDownloadListener)
-
-        downloadMap[cloudFile.id] = downloadTask
-        downloadExecutor.execute(downloadTask)
+        downloadService.download(cloudFile, onDownloadListener)
     }
 
     override fun cancelDownloadFile(cloudFile: CloudFile) {
-        downloadMap[cloudFile.id]?.cancel() ?: return
-        downloadMap.remove(cloudFile.id)
+        downloadService.cancelDownload(cloudFile)
     }
 
     override fun shutdown() {
         executor.shutdownNow()
-        downloadExecutor.shutdownNow()
+        downloadService.shutdown()
     }
 
     private fun createFakeFiles(): List<CloudFile> {
@@ -64,7 +54,6 @@ class FakeRepository: FileRepository {
     }
 
     companion object {
-        private const val NUMBER_OF_DOWNLOAD_THREAD = 20
         private const val SLEEP_INTERVAL_FOR_QUERYING = 1000L
     }
 }

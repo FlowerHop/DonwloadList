@@ -1,5 +1,6 @@
-package com.flowerhop.downloadlist.model
+package com.flowerhop.downloadlist.model.service
 
+import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.OnDownloadListener
 import java.util.concurrent.atomic.AtomicBoolean
 
