@@ -3,10 +3,12 @@ package com.flowerhop.downloadlist.model.repository
 import com.flowerhop.downloadlist.model.CloudFile
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class FakeRepository: FileRepository {
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private val downloadExecutor: Executor = Executors.newFixedThreadPool(NUMBER_OF_DOWNLOAD_THREAD)
+    private val downloadMap: HashMap<String, DownloadTask> = HashMap()
 
     override fun queryFiles(onQueryListener: OnQueryListener) {
         executor.execute {
@@ -17,9 +19,17 @@ class FakeRepository: FileRepository {
     }
 
     override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        downloadExecutor.execute {
-            simulateDownload(cloudFile, onDownloadListener)
-        }
+        if (downloadMap[cloudFile.id] != null)  return
+
+        val downloadTask = DownloadTask.create(cloudFile, onDownloadListener)
+
+        downloadMap[cloudFile.id] = downloadTask
+        downloadExecutor.execute(downloadTask)
+    }
+
+    override fun cancelDownloadFile(cloudFile: CloudFile) {
+        downloadMap[cloudFile.id]?.cancel() ?: return
+        downloadMap.remove(cloudFile.id)
     }
 
     private fun createFakeFiles(): List<CloudFile> {
@@ -46,28 +56,52 @@ class FakeRepository: FileRepository {
         )
     }
 
-    private fun simulateDownload(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
+    companion object {
+        private const val NUMBER_OF_DOWNLOAD_THREAD = 20
+        private const val SLEEP_INTERVAL_FOR_QUERYING = 1000L
+    }
+}
+
+class DownloadTask private constructor(
+    private val cloudFile: CloudFile,
+    private var onDownloadListener: OnDownloadListener?): Runnable {
+
+    private val isCancelled = AtomicBoolean(false)
+    override fun run() {
         val totalSize = cloudFile.size
         var downloaded = 0L
         while (downloaded < totalSize) {
+            if (isCancelled.get()) {
+                onDownloadListener?.onCancel()
+                onDownloadListener = null
+                return
+            }
+
             Thread.sleep(SLEEP_INTERVAL_FOR_DOWNLOADING)
             downloaded += DOWNLOAD_SPEED
 
             val downloadedPortion:Float = downloaded.div(totalSize.toFloat())
-            onDownloadListener.onProgress((downloadedPortion*100).toInt())
+            onDownloadListener?.onProgress((downloadedPortion*100).toInt())
         }
 
-        onDownloadListener.onComplete()
+        onDownloadListener?.onComplete()
+        onDownloadListener = null
+    }
+
+    fun cancel() {
+        isCancelled.set(true)
     }
 
     companion object {
-        private const val NUMBER_OF_DOWNLOAD_THREAD = 20
         /**
          * download bytes per 100ms
          */
         private const val DOWNLOAD_SPEED = 1000L
 
-        private const val SLEEP_INTERVAL_FOR_QUERYING = 1000L
         private const val SLEEP_INTERVAL_FOR_DOWNLOADING = 100L
+
+        fun create(cloudFile: CloudFile, onDownloadListener: OnDownloadListener? = null): DownloadTask {
+            return DownloadTask(cloudFile, onDownloadListener)
+        }
     }
 }

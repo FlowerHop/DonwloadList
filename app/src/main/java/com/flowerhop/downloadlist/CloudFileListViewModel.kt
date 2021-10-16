@@ -6,7 +6,6 @@ import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.FileRepository
 import com.flowerhop.downloadlist.model.repository.OnDownloadListener
 import com.flowerhop.downloadlist.model.repository.OnQueryListener
-import com.flowerhop.downloadlist.ui.DownloadState
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
 
@@ -49,7 +48,6 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
 
                 selectedPosition = position
             }
-
             _cloudFileStates.value = _cloudFileStates.value
         }
     }
@@ -73,6 +71,14 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
                 _cloudFileStates.postValue(_cloudFileStates.value)
             }
 
+            override fun onCancel() {
+                _cloudFileStates.value?.let { states ->
+                    states[position] = states[position].copy(downloadState = UnDownloaded)
+                }
+
+                _cloudFileStates.postValue(_cloudFileStates.value)
+            }
+
             override fun onError() {
                 _cloudFileStates.value?.let { states ->
                     states[position] = states[position].copy(downloadState = UnDownloaded)
@@ -81,5 +87,10 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
                 _cloudFileStates.postValue(_cloudFileStates.value)
             }
         })
+    }
+
+    fun cancelDownload(position: Int) {
+        val cloudFile = _cloudFileStates.value?.get(position)?.data ?: return
+        repository.cancelDownloadFile(cloudFile)
     }
 }
