@@ -5,8 +5,6 @@ import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class FakeRepository(private val downloadService: CloudFileDownloadService): FileRepository {
     override fun getFiles(): Flow<Resource<List<CloudFile>>> = flow<Resource<List<CloudFile>>> {
