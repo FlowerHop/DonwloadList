@@ -2,12 +2,15 @@ package com.flowerhop.downloadlist
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.FileRepository
 import com.flowerhop.downloadlist.model.repository.OnDownloadListener
-import com.flowerhop.downloadlist.model.repository.OnQueryListener
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 class CloudFileListViewModel(private val repository: FileRepository): ViewModel() {
     private val _cloudFileStates: MutableLiveData<MutableList<StatefulData<CloudFile>>> = MutableLiveData(mutableListOf())
@@ -17,18 +20,22 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
     private var selectedPosition: Int = -1
 
     fun queryFiles() {
-        repository.queryFiles(object : OnQueryListener {
-            override fun onComplete(cloudFiles: List<CloudFile>) {
-                _cloudFileStates.value?.addAll(cloudFiles.map {
-                    StatefulData(it)
-                })
-                _cloudFileStates.postValue(_cloudFileStates.value)
-            }
+        viewModelScope.launch {
+            repository.getFiles().collect { resource ->
+                when (resource) {
+                    is Resource.Success<List<CloudFile>> -> {
+                        _cloudFileStates.value?.addAll(
+                            resource.data?.map { StatefulData(it) } ?: emptyList()
+                        )
+                        _cloudFileStates.postValue(_cloudFileStates.value)
+                    }
+                    else -> {
+                        // TODO: Error Handling
+                    }
+                }
 
-            override fun onError() {
-                // TODO: Query Done
             }
-        })
+        }
     }
 
     fun selectOn(position: Int) {

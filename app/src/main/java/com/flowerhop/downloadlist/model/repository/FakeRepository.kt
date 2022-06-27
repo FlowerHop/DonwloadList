@@ -1,19 +1,17 @@
 package com.flowerhop.downloadlist.model.repository
 
+import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class FakeRepository(private val downloadService: CloudFileDownloadService): FileRepository {
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-
-    override fun queryFiles(onQueryListener: OnQueryListener) {
-        executor.execute {
-            val list = createFakeFiles()
-            Thread.sleep(SLEEP_INTERVAL_FOR_QUERYING)
-            onQueryListener.onComplete(list)
-        }
+    override fun getFiles(): Flow<Resource<List<CloudFile>>> = flow<Resource<List<CloudFile>>> {
+        val resource = Resource.Success(createFakeFiles())
+        emit(resource)
     }
 
     override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
@@ -25,7 +23,6 @@ class FakeRepository(private val downloadService: CloudFileDownloadService): Fil
     }
 
     override fun shutdown() {
-        executor.shutdownNow()
         downloadService.shutdown()
     }
 
