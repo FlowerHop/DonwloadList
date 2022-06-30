@@ -32,8 +32,33 @@ class CloudFileListAdapter(private val onEventHandler: OnEventHandler): ListAdap
             return true
         }
 
+        override fun getChangePayload(
+            oldItem: StatefulData<CloudFile>,
+            newItem: StatefulData<CloudFile>
+        ): Any? {
+            val map = mutableMapOf<String, Any>().apply {
+                if (oldItem.selected != newItem.selected) {
+                    put(BUNDLE_KEY_SELECTED, newItem.selected)
+                }
+
+                if (oldItem.downloadState != newItem.downloadState) {
+                    put(BUNDLE_KEY_DOWNLOAD_STATE, newItem.downloadState)
+                }
+
+                if (oldItem.data != newItem.data) {
+                    put(BUNDLE_KEY_DATA, newItem.data)
+                }
+            }
+
+            return map.ifEmpty { super.getChangePayload(oldItem, newItem) }
+        }
     }
 ) {
+    companion object {
+        const val BUNDLE_KEY_SELECTED = "bundle_key_selected"
+        const val BUNDLE_KEY_DOWNLOAD_STATE = "bundle_key_download_state"
+        const val BUNDLE_KEY_DATA = "bundle_key_data"
+    }
     interface OnEventHandler {
         fun onClick(position: Int)
         fun onDownload(position: Int)
@@ -49,6 +74,25 @@ class CloudFileListAdapter(private val onEventHandler: OnEventHandler): ListAdap
         holder.bind(
             getItem(position)
         )
+    }
+
+    override fun onBindViewHolder(
+        holder: CloudFileViewHolder,
+        position: Int,
+        payloads: MutableList<Any>
+    ) {
+        if (payloads.isEmpty()) {
+            onBindViewHolder(holder, position)
+        } else {
+            val map = payloads[0] as Map<String, Any>
+            map.forEach { (key, value) ->
+                when (key) {
+                    BUNDLE_KEY_SELECTED -> holder.bindSelected(value as Boolean)
+                    BUNDLE_KEY_DOWNLOAD_STATE -> holder.bindDownloadState(value as DownloadState)
+                    BUNDLE_KEY_DATA -> holder.bindData(value as CloudFile)
+                }
+            }
+        }
     }
 }
 
@@ -76,19 +120,23 @@ class CloudFileViewHolder(binding: ItemCloudFileBinding, onEventHandler: CloudFi
         checkDownloadBtn = binding.checkBtn
     }
 
-    fun bind(state: StatefulData<CloudFile>) {
-        val cloudFile = state.data
-        itemView.isSelected = state.selected
-        fileNameText.text = cloudFile.fileName
+    fun bindSelected(selected: Boolean) {
+        itemView.isSelected = selected
+    }
 
-        if (state.downloadState is Downloading) {
-            downloadProgress.progress = state.downloadState.progress
+    fun bindData(data: CloudFile) {
+        fileNameText.text = data.fileName
+    }
+
+    fun bindDownloadState(downloadState: DownloadState) {
+        if (downloadState is Downloading) {
+            downloadProgress.progress = downloadState.progress
             downloadProgress.visibility = View.VISIBLE
         } else {
             downloadProgress.visibility = View.GONE
         }
 
-        when (state.downloadState) {
+        when (downloadState) {
             Downloaded -> {
                 checkDownloadBtn.visibility = View.VISIBLE
                 downloadBtn.visibility = View.INVISIBLE
@@ -105,5 +153,11 @@ class CloudFileViewHolder(binding: ItemCloudFileBinding, onEventHandler: CloudFi
                 cancelDownloadBtn.visibility = View.VISIBLE
             }
         }
+    }
+
+    fun bind(state: StatefulData<CloudFile>) {
+        bindSelected(state.selected)
+        bindData(state.data)
+        bindDownloadState(state.downloadState)
     }
 }
