@@ -6,23 +6,13 @@ import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
-class FakeRepository(private val downloadService: CloudFileDownloadService): FileRepository {
+class FakeRepository: FileRepository {
     override fun getFiles(): Flow<Resource<List<CloudFile>>> = flow<Resource<List<CloudFile>>> {
         val resource = Resource.Success(createFakeFiles())
         emit(resource)
     }
 
-    override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        downloadService.download(cloudFile, onDownloadListener)
-    }
-
-    override fun cancelDownloadFile(cloudFile: CloudFile) {
-        downloadService.cancelDownload(cloudFile)
-    }
-
-    override fun shutdown() {
-        downloadService.shutdown()
-    }
+    override fun shutdown() {}
 
     private fun createFakeFiles(): List<CloudFile> {
         return listOf(

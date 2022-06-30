@@ -6,9 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.FileRepository
-import com.flowerhop.downloadlist.model.repository.OnDownloadListener
+import com.flowerhop.downloadlist.model.DownloadFlowBuilder
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -18,6 +19,7 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
        get() = _cloudFileStates
 
     private var selectedPosition: Int = -1
+    private val jobMap: HashMap<String, Job> = HashMap()
 
     fun queryFiles() {
         viewModelScope.launch {
@@ -60,44 +62,52 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
     }
 
     fun download(position: Int) {
+        if (_cloudFileStates.value?.get(position)?.downloadState == Downloaded) return
         val cloudFile: CloudFile = _cloudFileStates.value?.get(position)?.data ?: return
-        repository.downloadFile(cloudFile, object : OnDownloadListener {
-            override fun onComplete() {
-                _cloudFileStates.value?.let { states ->
-                    states[position] = states[position].copy(downloadState = Downloaded)
+        if (jobMap[cloudFile.id] != null) return
+
+        jobMap[cloudFile.id] = viewModelScope.launch {
+            DownloadFlowBuilder(cloudFile).build().collect { resource ->
+                when (resource) {
+                    is Resource.Success -> {
+                        _cloudFileStates.value?.let { states ->
+                            states[position] = states[position].copy(downloadState = Downloaded)
+                        }
+
+                        _cloudFileStates.postValue(_cloudFileStates.value)
+                        jobMap.remove(cloudFile.id)
+                    }
+                    is Resource.Loading -> {
+                        _cloudFileStates.value?.let { states ->
+                            states[position] = states[position].copy(downloadState = Downloading(resource.progress!!))
+                        }
+
+                        _cloudFileStates.postValue(_cloudFileStates.value)
+                    }
+                    else -> {
+                        _cloudFileStates.value?.let { states ->
+                            states[position] = states[position].copy(downloadState = UnDownloaded)
+                        }
+
+                        _cloudFileStates.postValue(_cloudFileStates.value)
+                        jobMap.remove(cloudFile.id)
+                    }
                 }
-
-                _cloudFileStates.postValue(_cloudFileStates.value)
             }
-
-            override fun onProgress(progress: Int) {
-                _cloudFileStates.value?.let { states ->
-                    states[position] = states[position].copy(downloadState = Downloading(progress))
-                }
-
-                _cloudFileStates.postValue(_cloudFileStates.value)
-            }
-
-            override fun onCancel() {
-                _cloudFileStates.value?.let { states ->
-                    states[position] = states[position].copy(downloadState = UnDownloaded)
-                }
-
-                _cloudFileStates.postValue(_cloudFileStates.value)
-            }
-
-            override fun onError() {
-                _cloudFileStates.value?.let { states ->
-                    states[position] = states[position].copy(downloadState = UnDownloaded)
-                }
-
-                _cloudFileStates.postValue(_cloudFileStates.value)
-            }
-        })
+        }
     }
 
     fun cancelDownload(position: Int) {
         val cloudFile = _cloudFileStates.value?.get(position)?.data ?: return
-        repository.cancelDownloadFile(cloudFile)
+
+        jobMap[cloudFile.id]?.let {
+            it.cancel()
+            _cloudFileStates.value?.let { states ->
+                states[position] = states[position].copy(downloadState = UnDownloaded)
+            }
+
+            _cloudFileStates.postValue(_cloudFileStates.value)
+            jobMap.remove(cloudFile.id)
+        }
     }
 }

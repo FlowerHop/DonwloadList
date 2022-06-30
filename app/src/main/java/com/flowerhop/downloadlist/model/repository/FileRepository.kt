@@ -6,7 +6,5 @@ import kotlinx.coroutines.flow.Flow
 
 interface FileRepository {
     fun getFiles(): Flow<Resource<List<CloudFile>>>
-    fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener)
-    fun cancelDownloadFile(cloudFile: CloudFile)
     fun shutdown()
 }
