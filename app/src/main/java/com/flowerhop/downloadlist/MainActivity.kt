@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity() {
 
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-        recyclerView.itemAnimator = null
         viewModel.queryFiles()
     }
 }
