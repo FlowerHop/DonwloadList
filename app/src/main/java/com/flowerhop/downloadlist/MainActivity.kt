@@ -1,15 +1,18 @@
 package com.flowerhop.downloadlist
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.LayoutInflater
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.flowerhop.downloadlist.databinding.ActivityMainBinding
-import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import com.flowerhop.downloadlist.model.repository.FakeRepository
 import com.flowerhop.downloadlist.mvvm.AnyViewModelFactory
 import com.flowerhop.downloadlist.ui.CloudFileListAdapter
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,8 +42,12 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        viewModel.cloudFileStates.observe(this) {
-            adapter.submitList(it.toMutableList())
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.cloudFileStates.collect {
+                    adapter.submitList(it)
+                }
+            }
         }
 
         recyclerView.adapter = adapter
