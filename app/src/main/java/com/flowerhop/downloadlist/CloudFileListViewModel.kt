@@ -6,20 +6,22 @@ import androidx.lifecycle.viewModelScope
 import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.FileRepository
-import com.flowerhop.downloadlist.model.DownloadFlowBuilder
+import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
+import com.flowerhop.downloadlist.model.service.DownloadService
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-class CloudFileListViewModel(private val repository: FileRepository): ViewModel() {
+class CloudFileListViewModel(
+    private val repository: FileRepository,
+): ViewModel() {
     private val _cloudFileStates: MutableLiveData<MutableList<StatefulData<CloudFile>>> = MutableLiveData(mutableListOf())
     val cloudFileStates: MutableLiveData<MutableList<StatefulData<CloudFile>>>
        get() = _cloudFileStates
 
     private var selectedPosition: Int = -1
-    private val jobMap: HashMap<String, Job> = HashMap()
+
+    private val downloadFlowService: DownloadService<CloudFile> = CloudFileDownloadService(viewModelScope)
 
     fun queryFiles() {
         viewModelScope.launch {
@@ -64,10 +66,8 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
     fun download(position: Int) {
         if (_cloudFileStates.value?.get(position)?.downloadState == Downloaded) return
         val cloudFile: CloudFile = _cloudFileStates.value?.get(position)?.data ?: return
-        if (jobMap[cloudFile.id] != null) return
-
-        jobMap[cloudFile.id] = viewModelScope.launch {
-            DownloadFlowBuilder(cloudFile).build().collect { resource ->
+        viewModelScope.launch {
+            downloadFlowService.download(cloudFile).collect { resource ->
                 when (resource) {
                     is Resource.Success -> {
                         _cloudFileStates.value?.let { states ->
@@ -75,7 +75,6 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
                         }
 
                         _cloudFileStates.postValue(_cloudFileStates.value)
-                        jobMap.remove(cloudFile.id)
                     }
                     is Resource.Loading -> {
                         _cloudFileStates.value?.let { states ->
@@ -90,7 +89,6 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
                         }
 
                         _cloudFileStates.postValue(_cloudFileStates.value)
-                        jobMap.remove(cloudFile.id)
                     }
                 }
             }
@@ -99,15 +97,6 @@ class CloudFileListViewModel(private val repository: FileRepository): ViewModel(
 
     fun cancelDownload(position: Int) {
         val cloudFile = _cloudFileStates.value?.get(position)?.data ?: return
-
-        jobMap[cloudFile.id]?.let {
-            it.cancel()
-            _cloudFileStates.value?.let { states ->
-                states[position] = states[position].copy(downloadState = UnDownloaded)
-            }
-
-            _cloudFileStates.postValue(_cloudFileStates.value)
-            jobMap.remove(cloudFile.id)
-        }
+        downloadFlowService.cancel(cloudFile)
     }
 }

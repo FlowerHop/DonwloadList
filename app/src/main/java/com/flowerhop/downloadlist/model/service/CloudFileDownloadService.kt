@@ -1,34 +1,29 @@
 package com.flowerhop.downloadlist.model.service
 
+import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
-import com.flowerhop.downloadlist.model.repository.OnDownloadListener
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharedFlow
 
-class CloudFileDownloadService: DownloadService<CloudFile> {
-    private val downloadExecutor: ExecutorService = Executors.newFixedThreadPool(
-        NUMBER_OF_DOWNLOAD_THREAD)
-    private val downloadMap: HashMap<String, DownloadTask> = HashMap()
+class CloudFileDownloadService(private val coroutineScope: CoroutineScope): DownloadService<CloudFile> {
+    private val taskMap: HashMap<String, DownloadTask> = HashMap()
 
-    override fun download(t: CloudFile, onDownloadListener: OnDownloadListener) {
-        if (downloadMap[t.id] != null) return
+    override fun download(t: CloudFile): SharedFlow<Resource<Unit>> {
+        if (taskMap[t.id] != null) return taskMap[t.id]!!.sharedFlow!!
+        val task = DownloadTask.create(t, coroutineScope)
+        taskMap[t.id] = task
+        task.start(externalScope = coroutineScope)
+        task.sharedFlow!!
 
-        val downloadTask = DownloadTask.create(t, onDownloadListener)
-
-        downloadMap[t.id] = downloadTask
-        downloadExecutor.execute(downloadTask)
+        return task.sharedFlow!!
     }
 
-    override fun cancelDownload(t: CloudFile) {
-        downloadMap[t.id]?.cancel() ?: return
-        downloadMap.remove(t.id)
-    }
-
-    override fun shutdown() {
-        downloadExecutor.shutdownNow()
+    override fun cancel(t: CloudFile) {
+        taskMap.remove(t.id)?.cancel()
     }
 
     companion object {
+        private const val TAG = "CLDownloadService"
         private const val NUMBER_OF_DOWNLOAD_THREAD = 20
     }
 }
