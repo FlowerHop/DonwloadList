@@ -1,6 +1,5 @@
 package com.flowerhop.downloadlist
 
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.flowerhop.downloadlist.common.Resource
@@ -10,13 +9,15 @@ import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import com.flowerhop.downloadlist.model.service.DownloadService
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class CloudFileListViewModel(
     private val repository: FileRepository,
 ): ViewModel() {
-    private val _cloudFileStates: MutableLiveData<MutableList<StatefulData<CloudFile>>> = MutableLiveData(mutableListOf())
-    val cloudFileStates: MutableLiveData<MutableList<StatefulData<CloudFile>>>
+    private val _cloudFileStates: MutableStateFlow<MutableList<StatefulData<CloudFile>>> = MutableStateFlow(mutableListOf())
+    val cloudFileStates: StateFlow<MutableList<StatefulData<CloudFile>>>
        get() = _cloudFileStates
 
     private var selectedPosition: Int = -1
@@ -28,10 +29,9 @@ class CloudFileListViewModel(
             repository.getFiles().collect { resource ->
                 when (resource) {
                     is Resource.Success<List<CloudFile>> -> {
-                        _cloudFileStates.value?.addAll(
+                        _cloudFileStates.value.addAll(
                             resource.data?.map { StatefulData(it) } ?: emptyList()
                         )
-                        _cloudFileStates.postValue(_cloudFileStates.value)
                     }
                     else -> {
                         // TODO: Error Handling
@@ -43,60 +43,58 @@ class CloudFileListViewModel(
     }
 
     fun selectOn(position: Int) {
-        _cloudFileStates.value?.let { states ->
-            if (selectedPosition == position) {
+        val newList = mutableListOf<StatefulData<CloudFile>>()
+        newList.addAll(_cloudFileStates.value.toMutableList())
+
+        // deselect
+        if (selectedPosition == position) {
+            newList[position] = newList[position].copy(selected = false)
+            selectedPosition = -1
+        } else {
+            // select
+            newList[position] = newList[position].copy(selected = true)
+
+            if (selectedPosition != -1) {
                 // deselect
-                states[position] = states[position].copy(selected = false)
-                selectedPosition = -1
-            } else {
-                // select
-                states[position] = states[position].copy(selected = true)
-
-                if (selectedPosition != -1) {
-                    // deselect
-                    states[selectedPosition] = states[selectedPosition].copy(selected = false)
-                }
-
-                selectedPosition = position
+                newList[selectedPosition] = newList[selectedPosition].copy(selected = false)
             }
-            _cloudFileStates.value = _cloudFileStates.value
+
+            selectedPosition = position
         }
+
+
+        _cloudFileStates.value = newList
     }
 
     fun download(position: Int) {
-        if (_cloudFileStates.value?.get(position)?.downloadState == Downloaded) return
-        val cloudFile: CloudFile = _cloudFileStates.value?.get(position)?.data ?: return
+        if (_cloudFileStates.value[position].downloadState == Downloaded) return
+        val cloudFile: CloudFile = _cloudFileStates.value[position].data ?: return
         viewModelScope.launch {
             downloadFlowService.download(cloudFile).collect { resource ->
-                when (resource) {
-                    is Resource.Success -> {
-                        _cloudFileStates.value?.let { states ->
-                            states[position] = states[position].copy(downloadState = Downloaded)
-                        }
+                val newList = mutableListOf<StatefulData<CloudFile>>().apply {
+                    addAll(_cloudFileStates.value)
+                }
 
-                        _cloudFileStates.postValue(_cloudFileStates.value)
+                val newDownloadState = when (resource) {
+                    is Resource.Success -> {
+                        Downloaded
                     }
                     is Resource.Loading -> {
-                        _cloudFileStates.value?.let { states ->
-                            states[position] = states[position].copy(downloadState = Downloading(resource.progress!!))
-                        }
-
-                        _cloudFileStates.postValue(_cloudFileStates.value)
+                        Downloading(resource.progress!!)
                     }
                     else -> {
-                        _cloudFileStates.value?.let { states ->
-                            states[position] = states[position].copy(downloadState = UnDownloaded)
-                        }
-
-                        _cloudFileStates.postValue(_cloudFileStates.value)
+                        UnDownloaded
                     }
                 }
+
+                newList[position] = newList[position].copy(downloadState = newDownloadState)
+                _cloudFileStates.value = newList
             }
         }
     }
 
     fun cancelDownload(position: Int) {
-        val cloudFile = _cloudFileStates.value?.get(position)?.data ?: return
+        val cloudFile = _cloudFileStates.value[position].data
         downloadFlowService.cancel(cloudFile)
     }
 }
