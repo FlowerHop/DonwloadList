@@ -12,8 +12,7 @@ class DownloadTask private constructor(
 ): Task<Unit>() {
     override val coroutineScope: CoroutineScope = externalScope
 
-    override val flow: Flow<Resource<Unit>>
-        get() = DownloadFlowBuilder(cloudFile).build()
+    override fun buildFlow(): Flow<Resource<Unit>> = DownloadFlowBuilder(cloudFile).build()
 
     companion object {
         /**
