@@ -1,33 +1,18 @@
 package com.flowerhop.downloadlist.model.repository
 
+import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
-class FakeRepository(private val downloadService: CloudFileDownloadService): FileRepository {
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-
-    override fun queryFiles(onQueryListener: OnQueryListener) {
-        executor.execute {
-            val list = createFakeFiles()
-            Thread.sleep(SLEEP_INTERVAL_FOR_QUERYING)
-            onQueryListener.onComplete(list)
-        }
+class FakeRepository: FileRepository {
+    override fun getFiles(): Flow<Resource<List<CloudFile>>> = flow<Resource<List<CloudFile>>> {
+        val resource = Resource.Success(createFakeFiles())
+        emit(resource)
     }
 
-    override fun downloadFile(cloudFile: CloudFile, onDownloadListener: OnDownloadListener) {
-        downloadService.download(cloudFile, onDownloadListener)
-    }
-
-    override fun cancelDownloadFile(cloudFile: CloudFile) {
-        downloadService.cancelDownload(cloudFile)
-    }
-
-    override fun shutdown() {
-        executor.shutdownNow()
-        downloadService.shutdown()
-    }
+    override fun shutdown() {}
 
     private fun createFakeFiles(): List<CloudFile> {
         return listOf(

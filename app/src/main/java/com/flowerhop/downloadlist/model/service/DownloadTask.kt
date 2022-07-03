@@ -1,38 +1,18 @@
 package com.flowerhop.downloadlist.model.service
 
+import com.flowerhop.downloadlist.common.Resource
 import com.flowerhop.downloadlist.model.CloudFile
-import com.flowerhop.downloadlist.model.repository.OnDownloadListener
-import java.util.concurrent.atomic.AtomicBoolean
+import com.flowerhop.downloadlist.model.DownloadFlowBuilder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 
 class DownloadTask private constructor(
     private val cloudFile: CloudFile,
-    private var onDownloadListener: OnDownloadListener?): Runnable {
+    externalScope: CoroutineScope
+): Task<Unit>() {
+    override val coroutineScope: CoroutineScope = externalScope
 
-    private val isCancelled = AtomicBoolean(false)
-    override fun run() {
-        val totalSize = cloudFile.size
-        var downloaded = 0L
-        while (downloaded < totalSize) {
-            if (isCancelled.get()) {
-                onDownloadListener?.onCancel()
-                onDownloadListener = null
-                return
-            }
-
-            Thread.sleep(SLEEP_INTERVAL_FOR_DOWNLOADING)
-            downloaded += DOWNLOAD_SPEED
-
-            val downloadedPortion:Float = downloaded.div(totalSize.toFloat())
-            onDownloadListener?.onProgress((downloadedPortion*100).toInt())
-        }
-
-        onDownloadListener?.onComplete()
-        onDownloadListener = null
-    }
-
-    fun cancel() {
-        isCancelled.set(true)
-    }
+    override fun buildFlow(): Flow<Resource<Unit>> = DownloadFlowBuilder(cloudFile).build()
 
     companion object {
         /**
@@ -42,8 +22,8 @@ class DownloadTask private constructor(
 
         private const val SLEEP_INTERVAL_FOR_DOWNLOADING = 100L
 
-        fun create(cloudFile: CloudFile, onDownloadListener: OnDownloadListener? = null): DownloadTask {
-            return DownloadTask(cloudFile, onDownloadListener)
+        fun create(cloudFile: CloudFile, externalScope: CoroutineScope): DownloadTask {
+            return DownloadTask(cloudFile, externalScope)
         }
     }
 }
