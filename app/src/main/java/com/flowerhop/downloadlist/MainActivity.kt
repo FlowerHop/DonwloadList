@@ -20,8 +20,7 @@ class MainActivity : AppCompatActivity() {
         val recyclerView = binding.cloudFileList
 
         val viewModelFactory = AnyViewModelFactory {
-            val downloadService = CloudFileDownloadService()
-            val fakeRepository = FakeRepository(downloadService)
+            val fakeRepository = FakeRepository()
             CloudFileListViewModel(fakeRepository)
         }
 
