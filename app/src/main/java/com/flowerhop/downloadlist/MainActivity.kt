@@ -1,7 +1,6 @@
 package com.flowerhop.downloadlist
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -17,7 +16,7 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val binding = ActivityMainBinding.inflate(LayoutInflater.from(this))
+        val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         val recyclerView = binding.cloudFileList
@@ -39,6 +38,15 @@ class MainActivity : AppCompatActivity() {
 
             override fun onCancel(position: Int) {
                 viewModel.cancelDownload(position)
+            }
+
+            override fun onRemove(position: Int) {
+                viewModel.remove(position)
+            }
+
+            override fun onSwap(srcPos: Int, endPos: Int): Boolean {
+                viewModel.swap(srcPos, endPos)
+                return true
             }
         })
 

@@ -7,6 +7,8 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.ItemTouchHelper.*
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.flowerhop.downloadlist.databinding.ItemCloudFileBinding
@@ -63,7 +65,27 @@ class CloudFileListAdapter(private val onEventHandler: OnEventHandler): ListAdap
         fun onClick(position: Int)
         fun onDownload(position: Int)
         fun onCancel(position: Int)
+        fun onRemove(position: Int)
+        fun onSwap(srcPos: Int, endPos: Int): Boolean
     }
+
+    private val onItemTouchHelper = ItemTouchHelper(
+        CustomItemTouchHelper (object : CustomItemTouchHelper.ItemActionHandler {
+            override fun onMoved(
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                return onEventHandler.onSwap(viewHolder.adapterPosition, target.adapterPosition)
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                onEventHandler.onRemove(viewHolder.adapterPosition)
+            }
+
+            override fun requireAction(viewHolder: RecyclerView.ViewHolder): Boolean {
+                return currentList[viewHolder.adapterPosition].downloadState !is Downloading
+            }
+        }))
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CloudFileViewHolder {
         val binding = ItemCloudFileBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -93,6 +115,44 @@ class CloudFileListAdapter(private val onEventHandler: OnEventHandler): ListAdap
                 }
             }
         }
+    }
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        onItemTouchHelper.attachToRecyclerView(recyclerView)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        onItemTouchHelper.attachToRecyclerView(null)
+    }
+}
+
+class CustomItemTouchHelper(private var handler: ItemActionHandler? = null): ItemTouchHelper.Callback() {
+    interface ItemActionHandler {
+        fun onMoved(viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean
+        fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int)
+        fun requireAction(viewHolder: RecyclerView.ViewHolder): Boolean
+    }
+
+    override fun getMovementFlags(
+        recyclerView: RecyclerView,
+        viewHolder: RecyclerView.ViewHolder
+    ): Int {
+        if(handler?.requireAction(viewHolder) == true)
+            return makeMovementFlags(UP.or(DOWN), RIGHT)
+        return makeMovementFlags(UP.or(DOWN), 0)
+    }
+
+    override fun onMove(
+        recyclerView: RecyclerView,
+        viewHolder: RecyclerView.ViewHolder,
+        target: RecyclerView.ViewHolder
+    ): Boolean = handler?.onMoved(viewHolder, target) ?: false
+
+
+    override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+        handler?.onSwiped(viewHolder, direction)
     }
 }
 

@@ -7,11 +7,13 @@ import com.flowerhop.downloadlist.model.CloudFile
 import com.flowerhop.downloadlist.model.repository.FileRepository
 import com.flowerhop.downloadlist.model.service.CloudFileDownloadService
 import com.flowerhop.downloadlist.model.service.DownloadService
+import com.flowerhop.downloadlist.ui.DownloadState
 import com.flowerhop.downloadlist.ui.DownloadState.*
 import com.flowerhop.downloadlist.ui.StatefulData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.*
 
 class CloudFileListViewModel(
     private val repository: FileRepository,
@@ -68,7 +70,7 @@ class CloudFileListViewModel(
 
     fun download(position: Int) {
         if (_cloudFileStates.value[position].downloadState == Downloaded) return
-        val cloudFile: CloudFile = _cloudFileStates.value[position].data ?: return
+        val cloudFile: CloudFile = _cloudFileStates.value[position].data
         viewModelScope.launch {
             downloadFlowService.download(cloudFile).collect { resource ->
                 val newList = mutableListOf<StatefulData<CloudFile>>().apply {
@@ -87,7 +89,10 @@ class CloudFileListViewModel(
                     }
                 }
 
-                newList[position] = newList[position].copy(downloadState = newDownloadState)
+                // could be removed
+                val target = newList.filter { it.data.id == cloudFile.id }.getOrElse(0) { return@collect }
+                val index = newList.indexOf(target)
+                newList[index] = newList[index].copy(downloadState = newDownloadState)
                 _cloudFileStates.value = newList
             }
         }
@@ -96,5 +101,33 @@ class CloudFileListViewModel(
     fun cancelDownload(position: Int) {
         val cloudFile = _cloudFileStates.value[position].data
         downloadFlowService.cancel(cloudFile)
+    }
+
+    fun remove(position: Int) {
+        if (selectedPosition == position)
+            selectedPosition = -1
+
+        if (_cloudFileStates.value[position].downloadState is DownloadState.Downloading) {
+            return
+        }
+
+        val newList = mutableListOf<StatefulData<CloudFile>>().apply {
+            addAll(_cloudFileStates.value)
+        }
+        newList.removeAt(position)
+        _cloudFileStates.value = newList
+    }
+
+    fun swap(srcPos: Int, endPos: Int) {
+        val newList = mutableListOf<StatefulData<CloudFile>>().apply {
+            addAll(_cloudFileStates.value)
+        }
+
+        Collections.swap(
+            newList,
+            srcPos, endPos
+        )
+
+        _cloudFileStates.value = newList
     }
 }
